@@ -11,6 +11,9 @@ import webify
 from webify.templates.helpers import html
 from webify.controllers import webargs
 
+# sudo pip install Beaker
+import beaker
+
 app = webify.defaults.app()
 
 @app.controller(path='/')
@@ -22,6 +25,12 @@ def index(req):
 @webargs.add(webargs.SettingsArgParser('updates_db'))
 @webargs.add(webargs.SettingsArgParser('users_db'))
 def profile(req, remaining, updates_db=None, users_db=None):
+    session = req.environ['beaker.session']
+    session['counter'] = session.get('counter', 0) + 1
+    session.save()
+    yield u'Pageviews: %s' % session['counter']
+    yield u'<br />'
+
     name, id, _ = remaining.split(u'/', 2)
     updates = updates_db.view('_design/updates/_view/updates_by_profile',
                               startkey=[id], endkey=[id, {}], include_docs=True)
@@ -63,10 +72,13 @@ if __name__ == '__main__':
                 'updates_db': updates_db,
                }
 
+    from beaker.middleware import SessionMiddleware
+
     wrapped_app = install_middleware(app, [
                                             SettingsMiddleware(settings),
                                             EvalException,
                                           ])
+    wrapped_app = SessionMiddleware(wrapped_app, key='mysession', secret='randomsecret')
 
     print 'Loading server...'
     server.serve(wrapped_app, host='127.0.0.1', port=8085, reload=True)

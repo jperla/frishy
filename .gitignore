@@ -1,0 +1,22 @@
+# ignore data
+*.data
+*.csv
+*.shelf
+*.xls
+*.doc
+*.pdf
+
+#compiled python files
+*.pyc
+
+#for vim files
+*.swp
+
+#for emacs files?
+*~
+*.cache
+*#*
+
+#for some other editor?
+*.DS_Store
+
