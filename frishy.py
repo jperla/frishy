@@ -11,6 +11,7 @@ import couchdb
 import webify
 from webify.templates.helpers import html
 from webify.controllers import webargs
+import markdown
 
 # sudo pip install Beaker
 import beaker
@@ -18,8 +19,22 @@ import beaker
 app = webify.defaults.app()
 
 @app.controller(path='/')
-def index(req):
-    yield u'Hello, world!'
+@webargs.add(webargs.SettingsArgParser('users_db'))
+def index(req, users_db):
+    yield u'Frishy.  Squish your friends!'
+    yield u'<br />'
+    yield html.a('/signin', 'sign in')
+    profiles = users_db.view('_design/users/_view/user_profiles', 
+                             limit=10, include_docs=True)
+    yield html.h2('Profiles:')
+    yield u'<ul>'
+    for p in profiles:
+        yield u'<li>'
+        yield html.a(profile.url(p.doc[u'name'].replace(' ', '_') + u'/' + p.doc.id + u'/'), p.doc[u'name'])
+        yield u'</li>'
+    yield u'</ul>'
+
+
 
 @app.controller()
 @webargs.add(webargs.SettingsArgParser('users_db'))
@@ -114,8 +129,6 @@ def profile(req, remaining, updates_db=None, users_db=None):
     session = req.environ['beaker.session']
     session[u'counter'] = session.get('counter', 0) + 1
     session.save()
-    yield u'Pageviews: %s' % session['counter']
-    yield u'<br />'
 
     user = session[u'user'] if u'user' in session else None
     user_profiles = profiles_of_user(users_db, user)
@@ -128,33 +141,48 @@ def profile(req, remaining, updates_db=None, users_db=None):
     yield html.h1(name.replace('_', ' '))
 
     if user is not None:
+        yield u'<form action="%s" method="POST">' % '/say'
+        yield u'%s ' % name.replace('_', ' ')
+        yield u'<input type="hidden" name="profile" value="%s" />' % id
+        yield u'<input type="text" name="message" value="is "'
         if id in user_profiles:
-            yield u'<p>This is your profile</p>'
-        else:
-            yield u'<form action="%s" method="POST">' % '/say'
-            yield u'<input type="hidden" name="profile" value="%s" />' % id
-            yield u'<input type="text" name="message" value="is " />'
-            yield u'<input type="submit" value="Say" />'
-            yield u'</form>'
-            yield u'<br />'
-            yield u'<br />'
+            yield u'disabled="true"'
+        yield u'/>'
+        yield u'<input type="submit" value="Say"'
+        if id in user_profiles:
+            yield u'disabled="true"'
+        yield u' />'
+        yield u'</form>'
+        if id in user_profiles:
+            yield u'<p style="font-size:smaller"><em>This is your profile</em>. You may not edit your profile.</p>'
+        yield u'<br />'
+        yield u'<br />'
 
+    updates = list(updates)
+    updates.reverse()
     for u in updates:
         yield u[u'value']
-        yield u' <b style="font-size:smaller;">'
+        yield u' <b style="font-size:x-small;">'
         yield webify.templates.helpers.time.fuzzy_time_diff(datetime.datetime.fromtimestamp(u.doc['date']))
         yield u' ago'
+        yield u' <a href="/" style="font-size:xx-small">(by Joseph)</a>'
         yield u'</b>'
         yield u'<br />'
 
     friends = users_db.view('_design/users/_view/friends',
                             startkey=[id], endkey=[id, {}], include_docs=True)
-    yield html.h2(u'Friends')
+    yield html.h2(u'Friends:')
+    yield u'<ul>'
     for f in friends:
         if f[u'key'][1] == 1:
+            yield u'<li>'
             yield html.a(profile.url(f.doc[u'name'].replace(' ', '_') + u'/' + f.doc.id + u'/'), f.doc[u'name'])
-            yield u'<br />'
+            yield u'</li>'
+    yield u'</ul>'
 
+
+    yield u'Pageviews: %s' % session['counter']
+    yield u'<br />'
 
     
 
