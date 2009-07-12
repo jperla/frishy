@@ -18,57 +18,60 @@ import beaker
 
 app = webify.defaults.app()
 
-@app.controller(path='/')
-@webargs.add(webargs.SettingsArgParser('users_db'))
-def index(req, users_db):
-    yield u'Frishy.  Squish your friends!'
-    yield u'<br />'
-    yield html.a('/signin', 'sign in')
+@app.subapp(path='/')
+@webify.urlable()
+def index(req, p):
+    users_db = req.settings[u'users_db']
+    p(u'Frishy.  Squish your friends!')
+    p(u'<br />')
+    p(html.a('/signin', 'sign in'))
     profiles = users_db.view('_design/users/_view/user_profiles', 
                              limit=10, include_docs=True)
-    yield html.h2('Profiles:')
-    yield u'<ul>'
+    p(html.h2('Profiles:'))
+    p(u'<ul>')
     for p in profiles:
-        yield u'<li>'
-        yield html.a(profile.url(p.doc[u'name'].replace(' ', '_') + u'/' + p.doc.id + u'/'), p.doc[u'name'])
-        yield u'</li>'
-    yield u'</ul>'
+        p(u'<li>')
+        p(html.a(profile.url(p.doc[u'name'].replace(' ', '_') + u'/' + p.doc.id + u'/'), p.doc[u'name']))
+        p(u'</li>')
+    p(u'</ul>')
 
 
 
-@app.controller()
-@webargs.add(webargs.SettingsArgParser('users_db'))
-def signin(req, users_db):
+@app.subapp()
+@webify.urlable()
+def signin(req, p):
+    users_db = req.settings[u'users_db']
     email = req.params.get('email', None)
     password = req.params.get('password', None)
     if email is not None:
         users = users_db.view('_design/users/_view/users_by_email',
                              key=email, include_docs=True)
         if len(users) < 1:
-            yield 'No user found'
+            p('No user found')
         else:
             user = list(users)[0]
             if password == user.doc[u'password']:
                 session = req.environ['beaker.session']
                 session[u'user'] = user.doc[u'user']
                 session.save()
-                yield u'signed in'
-                #yield webify.http.status.redirect('/')
+                p(u'signed in')
+                #webify.http.status.redirect('/')
             else:
-                yield u'failed password signin'
-                yield u'email: %s' % email
-                yield u'password-submitted: %s' % password
-                yield u'password: %s' % user.doc[u'password']
+                p(u'failed password signin')
+                p(u'email: %s' % email)
+                p(u'password-submitted: %s' % password)
+                p(u'password: %s' % user.doc[u'password'])
     else:
-        yield signin_form()
+        p(signin_form())
 
-@app.controller()
-def signout(req):
+@app.subapp()
+@webify.urlable()
+def signout(req, p):
     session = req.environ[u'beaker.session']
     session[u'user'] = None
     session.save()
-    yield u'Signed out'
-    #yield webify.http.status.redirect('/')
+    p(u'Signed out')
+    #webify.http.status.redirect('/')
     
 def signin_form():
     yield u'<form action="" method="POST">'
@@ -80,10 +83,11 @@ def signin_form():
     yield u'</form>'
     
 
-@app.controller()
-@webargs.add(webargs.SettingsArgParser('updates_db'))
-@webargs.add(webargs.SettingsArgParser('users_db'))
-def say(req, updates_db, users_db):
+@app.subapp()
+@webify.urlable()
+def say(req, p):
+    users_db = req.settings[u'users_db']
+    updates_db = req.settings[u'updates_db']
     session = req.environ['beaker.session']
     user = session[u'user'] if u'user' in session else None
     message = req.params.get('message', '')
@@ -100,15 +104,15 @@ def say(req, updates_db, users_db):
                     u'message': message,
                     u'type': u'update'}
         new_id = updates_db.create(update)
-        yield new_id
+        p(new_id)
     else:
-        yield u'You may not post to this profile'
-        yield u'<br />'
-        yield first_profile
-        yield u'<br />'
+        p(u'You may not post to this profile')
+        p(u'<br />')
+        p(first_profile)
+        p(u'<br />')
         for f in profile[u'friends']:
-            yield f
-            yield u'<br />'
+            p(f)
+            p(u'<br />')
 
 
 def profiles_of_user(users_db, user):
@@ -121,68 +125,68 @@ def profiles_of_user(users_db, user):
     return user_profiles
     
 
-@app.controller()
-@webargs.add(webargs.RemainingUrl())
-@webargs.add(webargs.SettingsArgParser('updates_db'))
-@webargs.add(webargs.SettingsArgParser('users_db'))
-def profile(req, remaining, updates_db=None, users_db=None):
+@app.subapp()
+@webargs.RemainingUrlableAppWrapper()
+def profile(req, p, remaining):
+    users_db = req.settings[u'users_db']
+    updates_db = req.settings[u'updates_db']
     session = req.environ['beaker.session']
     session[u'counter'] = session.get('counter', 0) + 1
     session.save()
 
     user = session[u'user'] if u'user' in session else None
     user_profiles = profiles_of_user(users_db, user)
-    yield u'<br />'
+    p(u'<br />')
 
     name, id, _ = remaining.split(u'/', 2)
 
     updates = updates_db.view('_design/updates/_view/updates_by_profile',
                               startkey=[id], endkey=[id, {}], include_docs=True)
-    yield html.h1(name.replace('_', ' '))
+    p(html.h1(name.replace('_', ' ')))
 
     if user is not None:
-        yield u'<form action="%s" method="POST">' % '/say'
-        yield u'%s ' % name.replace('_', ' ')
-        yield u'<input type="hidden" name="profile" value="%s" />' % id
-        yield u'<input type="text" name="message" value="is "'
+        p(u'<form action="%s" method="POST">' % '/say')
+        p(u'%s ' % name.replace('_', ' '))
+        p(u'<input type="hidden" name="profile" value="%s" />' % id)
+        p(u'<input type="text" name="message" value="is "')
         if id in user_profiles:
-            yield u'disabled="true"'
-        yield u'/>'
-        yield u'<input type="submit" value="Say"'
+            p(u'disabled="true"')
+        p(u'/>')
+        p(u'<input type="submit" value="Say"')
         if id in user_profiles:
-            yield u'disabled="true"'
-        yield u' />'
-        yield u'</form>'
+            p(u'disabled="true"')
+        p(u' />')
+        p(u'</form>')
         if id in user_profiles:
-            yield u'<p style="font-size:smaller"><em>This is your profile</em>. You may not edit your profile.</p>'
-        yield u'<br />'
-        yield u'<br />'
+            p(u'<p style="font-size:smaller"><em>This is your profile</em>. You may not edit your profile.</p>')
+        p(u'<br />')
+        p(u'<br />')
 
     updates = list(updates)
     updates.reverse()
     for u in updates:
-        yield u[u'value']
-        yield u' <b style="font-size:x-small;">'
-        yield webify.templates.helpers.time.fuzzy_time_diff(datetime.datetime.fromtimestamp(u.doc['date']))
-        yield u' ago'
-        yield u' <a href="/" style="font-size:xx-small">(by Joseph)</a>'
-        yield u'</b>'
-        yield u'<br />'
+        p(u[u'value'])
+        p(u' <b style="font-size:x-small;">')
+        p(webify.templates.helpers.time.fuzzy_time_diff(datetime.datetime.fromtimestamp(u.doc['date'])))
+        p(u' ago')
+        p(u' <a href="/" style="font-size:xx-small">(by Joseph)</a>')
+        p(u'</b>')
+        p(u'<br />')
 
     friends = users_db.view('_design/users/_view/friends',
                             startkey=[id], endkey=[id, {}], include_docs=True)
-    yield html.h2(u'Friends:')
-    yield u'<ul>'
+    p(html.h2(u'Friends:'))
+    p(u'<ul>')
     for f in friends:
         if f[u'key'][1] == 1:
-            yield u'<li>'
-            yield html.a(profile.url(f.doc[u'name'].replace(' ', '_') + u'/' + f.doc.id + u'/'), f.doc[u'name'])
-            yield u'</li>'
-    yield u'</ul>'
+            p(u'<li>')
+            p(html.a(profile.url(f.doc[u'name'].replace(' ', '_') + u'/' + f.doc.id + u'/'), f.doc[u'name']))
+            p(u'</li>')
+    p(u'</ul>')
 
 
-    yield u'Pageviews: %s' % session['counter']
-    yield u'<br />'
+    p(u'Pageviews: %s' % session['counter'])
+    p( u'<br />')
 
     
 
@@ -206,12 +210,14 @@ if __name__ == '__main__':
 
     from beaker.middleware import SessionMiddleware
 
-    wrapped_app = install_middleware(app, [
-                                            SettingsMiddleware(settings),
-                                            EvalException,
-                                          ])
+    wsgi_app = webify.wsgify(app)
+
+    wrapped_app = install_middleware(wsgi_app, [
+                                                SettingsMiddleware(settings),
+                                                EvalException,
+                                               ])
     wrapped_app = SessionMiddleware(wrapped_app, type='cookie', validate_key='randomstuff', key='mysession', secret='randomsecret')
 
     print 'Loading server...'
-    server.paste_serve(wrapped_app, host='127.0.0.1', port=8085, reload=False)
+    server.serve(wrapped_app, host='127.0.0.1', port=8085, reload=True)
 
