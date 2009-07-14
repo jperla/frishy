@@ -23,35 +23,31 @@ app = webify.defaults.app()
 def index(req, p):
     users_db = req.settings[u'users_db']
     p(u'Frishy.  Squish your friends!')
-    p(u'<br />')
+    p(html.br())
     p(html.a('/signin', 'sign in'))
     profiles = users_db.view('_design/users/_view/user_profiles', 
                              limit=10, include_docs=True)
     p(html.h2('Profiles:'))
-    p(u'<ul>')
-    for p in profiles:
-        p(u'<li>')
-        p(html.a(profile.url(p.doc[u'name'].replace(' ', '_') + u'/' + p.doc.id + u'/'), p.doc[u'name']))
-        p(u'</li>')
-    p(u'</ul>')
-
-
+    with html.ul(p):
+        for p in profiles:
+            url = profile.url(p.doc[u'name'].replace(' ', '_')+u'/'+p.doc.id+u'/')
+            p(html.li(html.a(url, p.doc[u'name'])))
 
 @app.subapp()
 @webify.urlable()
 def signin(req, p):
     users_db = req.settings[u'users_db']
-    email = req.params.get('email', None)
-    password = req.params.get('password', None)
+    email = req.params.get(u'email', None)
+    password = req.params.get(u'password', None)
     if email is not None:
-        users = users_db.view('_design/users/_view/users_by_email',
-                             key=email, include_docs=True)
+        users = users_db.view(u'_design/users/_view/users_by_email',
+                              key=email, include_docs=True)
         if len(users) < 1:
-            p('No user found')
+            p(u'No user found')
         else:
             user = list(users)[0]
             if password == user.doc[u'password']:
-                session = req.environ['beaker.session']
+                session = req.environ[u'beaker.session']
                 session[u'user'] = user.doc[u'user']
                 session.save()
                 p(u'signed in')
@@ -98,22 +94,21 @@ def say(req, p):
 
     if first_profile.id in target_profile[u'friends']:
         update = {u'profile': target_profile.id,
-                    u'creator': first_profile.id,
-                    u'date': int(time.time()),
-                    u'deleted': False,
-                    u'message': message,
-                    u'type': u'update'}
+                  u'creator': first_profile.id,
+                  u'date': int(time.time()),
+                  u'deleted': False,
+                  u'message': message,
+                  u'type': u'update'}
         new_id = updates_db.create(update)
         p(new_id)
     else:
         p(u'You may not post to this profile')
-        p(u'<br />')
+        p(html.br())
         p(first_profile)
-        p(u'<br />')
+        p(html.br())
         for f in profile[u'friends']:
             p(f)
-            p(u'<br />')
-
+            p(html.br())
 
 def profiles_of_user(users_db, user):
     user_profiles = {}
@@ -136,7 +131,7 @@ def profile(req, p, remaining):
 
     user = session[u'user'] if u'user' in session else None
     user_profiles = profiles_of_user(users_db, user)
-    p(u'<br />')
+    p(html.br())
 
     name, id, _ = remaining.split(u'/', 2)
 
@@ -159,8 +154,8 @@ def profile(req, p, remaining):
         p(u'</form>')
         if id in user_profiles:
             p(u'<p style="font-size:smaller"><em>This is your profile</em>. You may not edit your profile.</p>')
-        p(u'<br />')
-        p(u'<br />')
+        p(html.br())
+        p(html.br())
 
     updates = list(updates)
     updates.reverse()
@@ -171,22 +166,19 @@ def profile(req, p, remaining):
         p(u' ago')
         p(u' <a href="/" style="font-size:xx-small">(by Joseph)</a>')
         p(u'</b>')
-        p(u'<br />')
+        p(html.br())
 
     friends = users_db.view('_design/users/_view/friends',
                             startkey=[id], endkey=[id, {}], include_docs=True)
     p(html.h2(u'Friends:'))
-    p(u'<ul>')
-    for f in friends:
-        if f[u'key'][1] == 1:
-            p(u'<li>')
-            p(html.a(profile.url(f.doc[u'name'].replace(' ', '_') + u'/' + f.doc.id + u'/'), f.doc[u'name']))
-            p(u'</li>')
-    p(u'</ul>')
-
+    with html.ul(p):
+        for f in friends:
+            if f[u'key'][1] == 1:
+                url = profile.url(f.doc[u'name'].replace(' ', '_')+u'/'+f.doc.id+u'/')
+                p(html.li(html.a(url, f.doc[u'name'])))
 
     p(u'Pageviews: %s' % session['counter'])
-    p( u'<br />')
+    p(html.br())
 
     
 
